@@ -1,6 +1,8 @@
 /*
 Viikkotehtävä 3. RTOS-ohjelmointi (osa2)
 2p suoritus.
+RYG, vilkuttaa valoja UART väylään kirjoitetun serialin mukaan.
+Ei varsinaisia super looppeja, sillä valot jää odotaamanaa condvar signaaleja eikä pitäisi kuluttaa suoritinta.
 */
 
 #include <zephyr/kernel.h>
