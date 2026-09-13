@@ -1,3 +1,5 @@
+/* 2p suoritus, valot vilkkuu punainen, keltainen ja vihreä, 
+sekunnin välein. Syklin pystyy pysäyttämään napista ja jatkmaan painamalla nappia uudestan.*/
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/device.h>
