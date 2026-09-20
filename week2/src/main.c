@@ -5,8 +5,6 @@
 #include <inttypes.h>
 #include <zephyr/sys/util.h>
 
-<<<<<<< HEAD
-=======
 int led_state = 0;
 int old_state = 0;
 
@@ -38,7 +36,6 @@ void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32
 
 }
 
->>>>>>> f19ea218f60877b942264b4637047d09a580575a
 // Led pin configurations
 static const struct gpio_dt_spec red = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 static const struct gpio_dt_spec green = GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios);
@@ -55,17 +52,11 @@ K_THREAD_DEFINE(yellow_thread,STACKSIZE,yellow_led_task,NULL,NULL,NULL,PRIORITY,
 
 
 int init_led(void);
-<<<<<<< HEAD
-=======
-int init_button(void);
->>>>>>> f19ea218f60877b942264b4637047d09a580575a
 
 // Main program
 int main(void)
 {
 	init_led();
-<<<<<<< HEAD
-=======
 	
 
 	int ret = init_button();
@@ -76,7 +67,6 @@ int main(void)
 	while (1) {
 		k_msleep(10);
 	}
->>>>>>> f19ea218f60877b942264b4637047d09a580575a
 
 	return 0;
 }
@@ -109,29 +99,6 @@ int  init_led() {
 	return 0;
 }
 
-<<<<<<< HEAD
-int led_state = 0;
-
-// Task to handle red led
-void red_led_task(void *, void *, void*) {
-	printk("Red led thread started\n");
-	while (true) {
-		if (led_state == 0) {
-		// 1. set led on 
-		gpio_pin_set_dt(&red,1);
-		printk("Red on\n");
-		// 2. sleep for 2 seconds
-		k_sleep(K_SECONDS(1));
-		// 3. set led off
-		gpio_pin_set_dt(&red,0);
-		printk("Red off\n");
-		// 4. sleep for 2 seconds
-		k_sleep(K_SECONDS(1));
-		led_state = 1;
-		}
-		k_msleep(1);
-	}
-=======
 
 void red_led_task(void *, void *, void*) {
     printk("Red led thread started\n");
@@ -160,32 +127,10 @@ void red_led_task(void *, void *, void*) {
         
         k_msleep(1);
     }
->>>>>>> f19ea218f60877b942264b4637047d09a580575a
 }
 
 // Task to handle yellow led
 void yellow_led_task(void *, void *, void*) {
-<<<<<<< HEAD
-	printk("Yellow led thread started\n");
-	while (true) {
-		if (led_state == 1) {
-		// 1. set led on 
-		gpio_pin_set_dt(&green,1);
-		gpio_pin_set_dt(&red,1);
-		printk("Yellow on\n");
-		// 2. sleep for 2 seconds
-		k_sleep(K_SECONDS(1));
-		// 3. set led off
-		gpio_pin_set_dt(&green,0);
-		gpio_pin_set_dt(&red,0);
-		printk("Yellow off\n");
-		// 4. sleep for 2 seconds
-		k_sleep(K_SECONDS(1));
-		led_state = 2;
-		}
-		k_msleep(1);
-	}
-=======
     printk("Yellow led thread started\n");
     while (true) {
 
@@ -214,33 +159,10 @@ void yellow_led_task(void *, void *, void*) {
         
         k_msleep(1);
     }
->>>>>>> f19ea218f60877b942264b4637047d09a580575a
 }
 
 // Task to handle green led
 void green_led_task(void *, void *, void*) {
-<<<<<<< HEAD
-	printk("Green led thread started\n");
-	while (true) {
-		if (led_state == 2) {
-		// 1. set led on 
-		gpio_pin_set_dt(&green,1);
-		printk("Green on\n");
-		// 2. sleep for 2 seconds
-		k_sleep(K_SECONDS(1));
-		// 3. set led off
-		gpio_pin_set_dt(&green,0);
-		printk("Green off\n");
-		// 4. sleep for 2 seconds
-		k_sleep(K_SECONDS(1));
-		led_state = 0;
-		}
-		k_msleep(1);
-	}
-}
-
-
-=======
     printk("Green led thread started\n");
     while (true) {
 
@@ -296,4 +218,3 @@ int init_button() {
 	
 	return 0;
 }
->>>>>>> f19ea218f60877b942264b4637047d09a580575a
