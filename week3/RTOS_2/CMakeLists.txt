@@ -3,4 +3,4 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 project(RTOS_2)
 
-target_sources(app PRIVATE src/dispatcher.c)
+target_sources(app PRIVATE src/main.c)

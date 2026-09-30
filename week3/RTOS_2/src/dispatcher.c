@@ -150,8 +150,8 @@ void uart_task(void *unused1, void *unused2, void *unused3)
 
 /********************
  * Dispatcher task
- */
-/*void dispatcher_task(void *unused1, void *unused2, void *unused3)
+*/
+void dispatcher_task(void *unused1, void *unused2, void *unused3)
 {
 	while (true) {
 		// Receive dispatcher data from uart_task fifo
@@ -160,9 +160,6 @@ void uart_task(void *unused1, void *unused2, void *unused3)
 		memcpy(sequence,rec_item->msg,20);
 		k_free(rec_item);
 		printk("Dispatcher: %s\n", sequence);
-        //char color = sequence[0];
-        //int time = atoi(sequence+2);
-		//printk("Data: %c %d\n", color, time);
         int cnt=0;
         while (sequence[cnt] != 0) {
 
@@ -206,74 +203,6 @@ void uart_task(void *unused1, void *unused2, void *unused3)
         // Send the parsed color information to tasks using fifoawd
         // Use release signal to control sequence or k_yield
 	}
-}*/
-
-
-
-// Define this globally so your LED tasks can read the requested delay time
-int current_blink_time_ms = 0; 
-
-void dispatcher_task(void *unused1, void *unused2, void *unused3)
-{
-    while (true) {
-        // Receive dispatcher data from uart_task fifo
-        struct data_t *rec_item = k_fifo_get(&dispatcher_fifo, K_FOREVER);
-        
-        // Use a slightly larger buffer and ensure it is null-terminated
-        char sequence[64] = {0}; 
-        
-        // Assuming rec_item->msg is null-terminated, or at least max 63 chars. 
-        // Adjust the length limit to match your rec_item->msg size.
-        strncpy(sequence, rec_item->msg, sizeof(sequence) - 1);
-        k_free(rec_item);
-        
-        printk("Dispatcher received: %s\n", sequence);
-
-        char *saveptr;
-        // Tokenize the string using \r and \n as delimiters
-        char *token = strtok_r(sequence, "\r\n", &saveptr);
-        
-        while (token != NULL) {
-            char color;
-            int time_ms;
-            
-            // Extract the color character and the time integer from the token (e.g., "R,500")
-            if (sscanf(token, "%c,%d", &color, &time_ms) == 2) {
-                printk("Parsed -> Color: %c, Time: %d ms\n", color, time_ms);
-                
-                // Share the parsed time with the LED tasks
-                current_blink_time_ms = time_ms; 
-
-                // Signal the correct LED task
-                if (color == 'R') {
-                    printk("Signaling RED\n");
-                    k_condvar_broadcast(&red_signal);
-                } else if (color == 'Y') {
-                    printk("Signaling YELLOW\n");
-                    k_condvar_broadcast(&yellow_signal);
-                } else if (color == 'G') {
-                    printk("Signaling GREEN\n");
-                    k_condvar_broadcast(&green_signal);
-                } else {
-                    printk("Unknown color command: %c\n", color);
-                    // Skip to the next token if it's invalid so we don't block forever
-                    token = strtok_r(NULL, "\r\n", &saveptr);
-                    continue;
-                }
-
-                // Wait for the specific LED task to finish its blink cycle
-                k_mutex_lock(&release_mutex, K_FOREVER);
-                k_condvar_wait(&release_signal, &release_mutex, K_FOREVER);
-                k_mutex_unlock(&release_mutex);
-                
-            } else {
-                printk("Failed to parse token: %s\n", token);
-            }
-            
-            // Get the next command in the sequence
-            token = strtok_r(NULL, "\r\n", &saveptr);
-        }
-    }
 }
 
 

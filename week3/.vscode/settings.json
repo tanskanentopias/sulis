@@ -1,0 +1,6 @@
+{
+    "cmake.sourceDirectory": "/home/topiastanskanen/code/sulis/sulis/week3/RTOS_2",
+    "nrf-connect.applications": [
+        "${workspaceFolder}/RTOS_2"
+    ]
+}
