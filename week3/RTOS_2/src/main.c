@@ -1,6 +1,6 @@
-/* 2p suoritus, piiri vilkuttaa valoja serialiin kirjoitetun sekvenssin mukaan.
-Laittamalla sekvennin loppuun 'T' voi sekvenssiä toistaa niin pitkään kun sen haluaa lopettaa kirjaimella 'B' 
-tai kirjoittamalla uuden sekvenssin serialiin.*/
+/* 3p suoritus, piiri vilkuttaa valoja serialiin kirjoitetun sekvenssin mukaan.
+Laittamalla sekvennin loppuun 'T' voi sekvenssiä toistaa niin pitkään kun sen haluaa lopettaa painamalla esim rivinvaihtoa. 
+Ei myöskään supelooppeja led_taskeissa, vaan käytetään THREAD APIa sekä signaali & condvar mekanismia*/
 
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
@@ -38,13 +38,14 @@ static struct gpio_callback button_4_data;
 static const struct gpio_dt_spec red = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 static const struct gpio_dt_spec green = GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios);
 
-// Led thread initialization
+// Led tasks
 void red_led_task(void *, void *, void*);
 void green_led_task(void *, void *, void*);
 void yellow_led_task(void *, void *, void*);
-K_THREAD_DEFINE(red_thread,STACKSIZE,red_led_task,NULL,NULL,NULL,PRIORITY,0,0);
-K_THREAD_DEFINE(green_thread,STACKSIZE,green_led_task,NULL,NULL,NULL,PRIORITY,0,0);
-K_THREAD_DEFINE(yellow_thread,STACKSIZE,yellow_led_task,NULL,NULL,NULL,PRIORITY,0,0);
+
+// Led thread initialization
+K_THREAD_STACK_DEFINE(led_stack_area, STACKSIZE); //ledeille tehdään värin mukainen threadi dispatcherissä
+struct k_thread led_thread_data;
 
 // UART initialization
 #define UART_DEVICE_NODE DT_CHOSEN(zephyr_shell_uart)
@@ -59,27 +60,15 @@ K_THREAD_DEFINE(dis_thread,STACKSIZE,dispatcher_task,NULL,NULL,NULL,PRIORITY,0,0
 K_THREAD_DEFINE(uart_thread,STACKSIZE,uart_task,NULL,NULL,NULL,PRIORITY,0,0);
 
 
-
-K_MUTEX_DEFINE(red_mutex);
-K_CONDVAR_DEFINE(red_signal);
-K_MUTEX_DEFINE(yellow_mutex);
-K_CONDVAR_DEFINE(yellow_signal);
-K_MUTEX_DEFINE(green_mutex);
-K_CONDVAR_DEFINE(green_signal);
 K_MUTEX_DEFINE(release_mutex);
 K_CONDVAR_DEFINE(release_signal);
 
 struct data_t {
-	/*************************
-	// Add fifo_reserved below
-	*************************/
 	void *fifo_reserved;
 	char msg[20];
 };
 
-/********************
- * init UART
- */
+
 int init_uart(void) {
 	// UART initialization
 	if (!device_is_ready(uart_dev)) {
@@ -93,7 +82,7 @@ int init_uart(void) {
 int init_button(void);
 int init_led(void);
 
-// Main program
+
 int main(void)
 {
 	init_led();
@@ -117,9 +106,7 @@ int main(void)
 	return 0;
 }
 
-/********************
- * UART task
- */
+
 void uart_task(void *unused1, void *unused2, void *unused3)
 {
 	// Received character from UART
@@ -166,9 +153,6 @@ void uart_task(void *unused1, void *unused2, void *unused3)
 	}
 }
 
-/********************
- * Dispatcher task
-*/
 void dispatcher_task(void *unused1, void *unused2, void *unused3)
 {
 	while (true) {
@@ -187,10 +171,6 @@ void dispatcher_task(void *unused1, void *unused2, void *unused3)
                 memcpy(sequence, new_item->msg, 20);
                 k_free(new_item);
                 cnt = 0;
-                if (sequence[0] == 'B') {
-                    printk("Sequence stopped.\n");
-                    break; 
-                }
                 continue; 
             }
 
@@ -205,31 +185,30 @@ void dispatcher_task(void *unused1, void *unused2, void *unused3)
                 }
             }
 
-            if (sequence[cnt] == 'R') {
+			if (sequence[cnt] == 'R') {
                 printk("RED\n");
-                k_condvar_broadcast(&red_signal);
+                k_thread_create(&led_thread_data, led_stack_area, STACKSIZE, red_led_task, NULL, NULL, NULL, PRIORITY, 0, K_NO_WAIT);
             }
-            
-            if (sequence[cnt] == 'Y') {
+            else if (sequence[cnt] == 'Y') {
                 printk("YELLOW\n");
-                k_condvar_broadcast(&yellow_signal);
+                k_thread_create(&led_thread_data, led_stack_area, STACKSIZE, yellow_led_task, NULL, NULL, NULL, PRIORITY, 0, K_NO_WAIT);
             }
-            
-            if (sequence[cnt] == 'G') {
+            else if (sequence[cnt] == 'G') {
                 printk("GREEN\n");
-                k_condvar_broadcast(&green_signal);
-
+                k_thread_create(&led_thread_data, led_stack_area, STACKSIZE, green_led_task, NULL, NULL, NULL, PRIORITY, 0, K_NO_WAIT);
             }
             
 		    cnt++;
 
+			k_mutex_lock(&release_mutex, K_FOREVER);
             k_condvar_wait(&release_signal, &release_mutex, K_FOREVER);
+			k_mutex_unlock(&release_mutex);
             
         }
 	}
 }
 
-// Button interrupt handler
+
 void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
 
@@ -331,13 +310,9 @@ void button_4_handler(const struct device *dev, struct gpio_callback *cb, uint32
 }
 
 
-
-
-
-// Initialize leds
 int  init_led() {
 
-	// Led pin initialization
+
 	int ret = gpio_pin_configure_dt(&red, GPIO_OUTPUT_ACTIVE);
 	int ret1 = gpio_pin_configure_dt(&green, GPIO_OUTPUT_ACTIVE);
 
@@ -352,7 +327,7 @@ int  init_led() {
 		return ret1;
 	}
 	
-	// set led off
+
 	gpio_pin_set_dt(&red,0);
 	gpio_pin_set_dt(&green,0);
 	
@@ -363,11 +338,7 @@ int  init_led() {
 }
 
 
-void red_led_task(void *, void *, void*) {
-    printk("Red led thread started\n");
-    while (true) {
-        
-            k_condvar_wait(&red_signal, &red_mutex, K_FOREVER);
+void red_led_task(void *unused1, void *unused2, void *unused3) {
 
             gpio_pin_set_dt(&red,1);
             printk("Red on\n");
@@ -377,18 +348,13 @@ void red_led_task(void *, void *, void*) {
             printk("Red off\n");
             k_sleep(K_MSEC(current_led_time));
             
+			k_mutex_lock(&release_mutex, K_FOREVER);
+   			k_condvar_broadcast(&release_signal);   
+    		k_mutex_unlock(&release_mutex);
 
-            k_condvar_broadcast(&release_signal);   
-
-    }
 }
 
-// Task to handle yellow led
-void yellow_led_task(void *, void *, void*) {
-    printk("Yellow led thread started\n");
-    while (true) {
-
-            k_condvar_wait(&yellow_signal, &yellow_mutex, K_FOREVER);
+void yellow_led_task(void *unused1, void *unused2, void *unused3) {
         
             gpio_pin_set_dt(&red,1);
             gpio_pin_set_dt(&green,1);
@@ -400,16 +366,13 @@ void yellow_led_task(void *, void *, void*) {
             printk("Yellow off\n");
             k_sleep(K_MSEC(current_led_time));
             
-            k_condvar_broadcast(&release_signal);  
-    }
+			k_mutex_lock(&release_mutex, K_FOREVER);
+   			k_condvar_broadcast(&release_signal);   
+    		k_mutex_unlock(&release_mutex);  
+
 }
 
-// Task to handle green led
-void green_led_task(void *, void *, void*) {
-    printk("Green led thread started\n");
-    while (true) {
-
-            k_condvar_wait(&green_signal, &green_mutex, K_FOREVER);
+void green_led_task(void *unused1, void *unused2, void *unused3) {
 
             gpio_pin_set_dt(&green,1);
             printk("Green on\n");
@@ -419,11 +382,12 @@ void green_led_task(void *, void *, void*) {
             printk("Green off\n");
             k_sleep(K_MSEC(current_led_time));
             
-            k_condvar_broadcast(&release_signal);  
-   }
+			k_mutex_lock(&release_mutex, K_FOREVER);
+   			k_condvar_broadcast(&release_signal);   
+    		k_mutex_unlock(&release_mutex);  
+
 }
 
-// Button initialization
 int init_button() {
 
 	int ret;
